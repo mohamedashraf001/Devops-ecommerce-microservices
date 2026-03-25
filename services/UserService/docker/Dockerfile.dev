@@ -2,18 +2,19 @@ FROM golang:1.25.3-alpine
 
 WORKDIR /app
 
-# Install air for hot reload and goose for migrations
+# تثبيت الأدوات اللازمة
 RUN go install github.com/air-verse/air@latest && \
     go install github.com/pressly/goose/v3/cmd/goose@latest
 
-# Copy go mod files
+# نسخ ملفات الـ modules أولاً لتسريع الـ Cache
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the entire project
+# نسخ المشروع بالكامل
 COPY . .
 
-EXPOSE 8080 50051
+# المنفذ الخاص بالـ gRPC والـ HTTP
+EXPOSE 8081 50051
 
-# Use air for hot reload
-CMD ["/go/bin/air", "-c", "./services/UserService/.air.toml"]
+# تشغيل Air مع ملف الإعدادات الخاص بالخدمة
+CMD ["air", "-c", "services/UserService/.air.toml"]

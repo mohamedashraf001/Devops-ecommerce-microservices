@@ -29,6 +29,6 @@ COPY --from=builder /app/api-gateway .
 # Copy config files
 COPY --from=builder /app/services/ApiGateway/config/.env ./config/.env
 
-EXPOSE 8080
+EXPOSE 8000
 
 CMD ["./api-gateway"]

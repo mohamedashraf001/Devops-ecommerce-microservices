@@ -1,45 +1,64 @@
-name: productservice
+version: '3.9'
 
 services:
-  app:
-    build:
-      context: ../../..
-      dockerfile: ./services/ProductService/docker/Dockerfile.dev
-    volumes:
-      - ../../..:/app
-      - /app/tmp
-    environment:
-      - INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN:-dev-internal-token}
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      product_service_network:
-      ecommerce_default:
-        aliases:
-          - productservice_app
-  db:
+  product-db:
     image: postgres:16-alpine
+    container_name: product-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: products
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - product-db-data:/var/lib/postgresql/data 
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d products"]
-      interval: 2s
+      interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - product_service_network
+      - product-net
+
+  product-redis:
+    image: redis:7-alpine
+    container_name: product-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+    networks:
+      - product-net
+
+  product-service:
+    build:
+      context: ../../../         
+      dockerfile: services/ProductService/docker/Dockerfile.dev
+    container_name: product-service
+    environment:
+      - INTERNAL_AUTH_TOKEN=dev-internal-token
+      - DB_DSN=host=product-db user=postgres password=postgres dbname=products port=5432 sslmode=disable TimeZone=UTC
+      - DB_DRIVER=postgres
+      - GRPC_PORT=50053
+      - DB_MIGRATION_AUTO_RUN=true
+      - REDIS_HOST=product-redis
+      - REDIS_PORT=6379
+      - ENABLE_CACHE=true
+    ports:
+      - "50053:50053"
+    volumes:
+      - ../../../:/app           
+    depends_on:
+      product-db:
+        condition: service_healthy
+      product-redis:
+        condition: service_healthy
+    networks:
+      - product-net
+      - ecommerce_default   # 👈 مهم جدًا
 
 volumes:
-  db_data:
+  product-db-data:
 
 networks:
-  product_service_network:
+  product-net:
     driver: bridge
+
   ecommerce_default:
     external: true

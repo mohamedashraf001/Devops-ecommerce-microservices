@@ -1,26 +1,47 @@
 name: cartservice
 
 services:
-  app:
+  cart-service:
     build:
       context: ../../..
       dockerfile: ./services/CartService/docker/Dockerfile.dev
+    container_name: cart_service_app
     volumes:
       - ../../..:/app
       - /app/tmp
     environment:
+      - REDIS_ADDR=redis:6379
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - APP_PORT=8082
+      - GRPC_PORT=50057
+      # التعديل الجوهري هنا:
+      - USER_SERVICE_GRPC_ADDR=user_service_app:50051  # اسم الحاوية وليس localhost
+      - PRODUCT_SERVICE_GRPC_ADDR=product_service_app:50053 
+      - APP_ENV=development
       - INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN:-dev-internal-token}
+      - SERVICE_NAME=cart-service
+      - JAEGER_ENDPOINT=ecommerce-jaeger:4317
+    ports:
+      - "50057:50057"
+      - "8082:8082"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     networks:
-      cart_service_network:
-      ecommerce_default:
-        aliases:
-          - cartservice_app
+      - cart_service_network
+      - ecommerce_default
+
   redis:
     image: redis:7-alpine
+    container_name: cart_service_redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     networks:
-      cart_service_network:
+      - cart_service_network
 
 volumes:
   redis_data:
@@ -28,5 +49,6 @@ volumes:
 networks:
   cart_service_network:
     driver: bridge
+
   ecommerce_default:
     external: true

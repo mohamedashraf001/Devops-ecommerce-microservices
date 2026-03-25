@@ -1,27 +1,27 @@
+# المرحلة الأولى: البناء
 FROM golang:1.25.3-alpine AS builder
 WORKDIR /app
 
-# Copy go mod files
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the entire project
 COPY . .
 
-# Build the service
+# بناء التطبيق
 RUN CGO_ENABLED=0 GOOS=linux go build -o userservice ./services/UserService/cmd/main.go
 
+# المرحلة الثانية: التشغيل
 FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
 
-# Copy the binary
+# نسخ الملف التنفيذي
 COPY --from=builder /app/userservice .
 
-# Copy migration files (embedded in binary via go:embed)
-COPY --from=builder /app/services/UserService/internal/migrations ./internal/migrations
+# نسخ ملفات الميغريشن (تأكد أن المسار يطابق ما يتوقعه الكود)
+COPY --from=builder /app/services/UserService/internal/migrations ./services/UserService/internal/migrations
 
 USER nonroot:nonroot
 
-EXPOSE 8080 50051
+EXPOSE 8081 50051
 
 CMD ["./userservice"]

@@ -1,19 +1,21 @@
 FROM golang:1.25.3-alpine
 
+# تثبيت الأدوات الأساسية
+RUN apk add --no-cache curl git build-base
+
+# العنوان الجديد للأداة (Air-verse)
+RUN go install github.com/air-verse/air@latest
+
 WORKDIR /app
 
-# Install air for hot reload and goose for migrations
-RUN go install github.com/air-verse/air@latest && \
-    go install github.com/pressly/goose/v3/cmd/goose@latest
+# إعدادات الموديولز
+ENV GO111MODULE=on
+ENV GOPROXY=https://proxy.golang.org,direct
 
-# Copy go mod files
+# نسخ ملفات الموديولز
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the entire project
-COPY . .
+EXPOSE 50053 8080
 
-EXPOSE 8080 50051
-
-# Use air for hot reload
-CMD ["/go/bin/air", "-c", "./services/ProductService/.air.toml"]
+CMD ["air", "-c", "services/ProductService/.air.toml"]

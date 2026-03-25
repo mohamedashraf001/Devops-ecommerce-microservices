@@ -1,205 +1,200 @@
-services:
-  jaeger:
-    image: jaegertracing/all-in-one:1.51
-    container_name: ecommece_jaeger
-    ports:
-      - "5775:5775/udp" # accept zipkin.thrift over compact thrift protocol
-      - "6831:6831/udp" # accept jaeger.thrift over compact thrift protocol
-      - "6832:6832/udp" # accept jaeger.thrift over binary thrift protocol
-      - "5778:5778" # serve configs
-      - "16686:16686" # Jaeger UI
-      - "14268:14268" # accept jaeger.thrift directly from clients
-      - "14250:14250" # accept model.proto
-      - "9411:9411" # Zipkin compatible endpoint
-      - "4317:4317" # OTLP gRPC receiver
-      - "4318:4318" # OTLP HTTP receiver
-    environment:
-      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
-      - COLLECTOR_OTLP_ENABLED=true
-    networks:
-      - ecommerce_default
+name: ecommerce-platform
 
-  userservice-db:
+services:
+  # --- API Gateway ---
+  api-gateway:
+    build:
+      context: .
+      dockerfile: ./services/ApiGateway/docker/Dockerfile.dev
+    container_name: api_gateway_app
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - /app/tmp
+    environment:
+      - APP_PORT=8000
+      - APP_ENV=development
+      - INTERNAL_AUTH_TOKEN=dev-internal-token
+      - JWT_SECRET=your-secret-key
+      - USER_SERVICE_URL=user-service:50051
+      - PRODUCT_SERVICE_URL=product-service:50053
+      - CART_SERVICE_URL=cart-service:50057
+      - ORDER_SERVICE_URL=order-service:50055
+    networks:
+      - ecommerce_network
+
+  # --- User Service ---
+  user-service:
+    build:
+      context: .
+      dockerfile: ./services/UserService/docker/Dockerfile.dev
+    container_name: user_service_app
+    volumes:
+      - .:/app
+      - /app/tmp
+    environment:
+      - DB_DRIVER=postgres
+      - DB_DSN=host=user-db user=postgres password=postgres dbname=ecommerce port=5432 sslmode=disable
+      - DB_MIGRATION_AUTO_RUN=true
+      - APP_PORT=8081
+      - GRPC_PORT=50051
+      - INTERNAL_AUTH_TOKEN=dev-internal-token
+      - JWT_SECRET=your-secret-key
+    depends_on:
+      user-db:
+        condition: service_healthy
+    networks:
+      - ecommerce_network
+
+  user-db:
     image: postgres:16-alpine
+    container_name: user_service_db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: ecommerce
     volumes:
-      - userservice_db_data:/var/lib/postgresql/data
+      - user_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 3s
-      timeout: 5s
-      retries: 10
-      start_period: 5s
+      interval: 5s
+      retries: 5
     networks:
-      - ecommerce_default
+      - ecommerce_network
 
-  userservice:
+  # --- Product Service ---
+  product-service:
     build:
       context: .
-      dockerfile: services/UserService/docker/Dockerfile.dev
+      dockerfile: services/ProductService/docker/Dockerfile.dev
+    container_name: product_service_app
     volumes:
       - .:/app
-      - /app/tmp
     environment:
-      - INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN:-dev-internal-token}
-      - DB_DSN=postgres://postgres:postgres@userservice-db:5432/ecommerce?sslmode=disable
+      - INTERNAL_AUTH_TOKEN=dev-internal-token
+      - JWT_SECRET=your-secret-key
+      - DB_DSN=host=product-db user=postgres password=postgres dbname=products port=5432 sslmode=disable
+      - DB_DRIVER=postgres
+      - GRPC_PORT=50053
+      - DB_MIGRATION_AUTO_RUN=true
+      - REDIS_HOST=product-redis
+      - REDIS_PORT=6379
+      - ENABLE_CACHE=true
     depends_on:
-      userservice-db:
+      product-db:
+        condition: service_healthy
+      product-redis:
         condition: service_healthy
     networks:
-      ecommerce_default:
-        aliases:
-          - userservice_app
+      - ecommerce_network
 
-  productservice-db:
+  product-db:
     image: postgres:16-alpine
+    container_name: product_service_db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: products
     volumes:
-      - productservice_db_data:/var/lib/postgresql/data
+      - product_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d products"]
-      interval: 3s
+      interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 5s
+      retries: 5
     networks:
-      - ecommerce_default
+      - ecommerce_network
 
-  productservice:
-    build:
-      context: .
-      dockerfile: services/ProductService/docker/Dockerfile.dev
-    volumes:
-      - .:/app
-      - /app/tmp
-    environment:
-      - INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN:-dev-internal-token}
-      - DB_DSN=postgres://postgres:postgres@productservice-db:5432/products?sslmode=disable
-    depends_on:
-      productservice-db:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      ecommerce_default:
-        aliases:
-          - productservice_app
-
-  cart-redis:
+  product-redis:
     image: redis:7-alpine
+    container_name: product_service_redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 3s
-      timeout: 5s
-      retries: 10
-      start_period: 5s
+      interval: 5s
     networks:
-      - ecommerce_default
+      - ecommerce_network
 
-  cartservice:
+  # --- Cart Service ---
+  cart-service:
     build:
       context: .
-      dockerfile: services/CartService/docker/Dockerfile.dev
+      dockerfile: ./services/CartService/docker/Dockerfile.dev
+    container_name: cart_service_app
     volumes:
       - .:/app
       - /app/tmp
     environment:
-      - INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN:-dev-internal-token}
+      # Changed to match the redis service name below
+      - REDIS_ADDR=cart-redis:6379 
       - REDIS_HOST=cart-redis
-      - PRODUCT_SERVICE_GRPC_ADDR=productservice_app:50053
-      - USER_SERVICE_GRPC_ADDR=userservice_app:50051
+      - REDIS_PORT=6379
+      - APP_PORT=8082
+      - GRPC_PORT=50057
+      - USER_SERVICE_GRPC_ADDR=user-service:50051
+      - PRODUCT_SERVICE_GRPC_ADDR=product-service:50053
+      - INTERNAL_AUTH_TOKEN=dev-internal-token
+      - JWT_SECRET=your-secret-key
     depends_on:
       cart-redis:
         condition: service_healthy
     networks:
-      ecommerce_default:
-        aliases:
-          - cartservice_app
+      - ecommerce_network
 
-  orderservice-db:
+  cart-redis:
+    image: redis:7-alpine
+    container_name: cart_service_redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ecommerce_network
+
+  # --- Order Service ---
+  order-service:
+    build:
+      context: .
+      dockerfile: ./services/OrderService/docker/Dockerfile.dev
+    container_name: order_service_app
+    volumes:
+      - .:/app
+      - /app/tmp
+    environment:
+      - DB_DSN=host=order-db user=postgres password=postgres dbname=orders port=5432 sslmode=disable
+      - APP_PORT=8085
+      - GRPC_PORT=50055
+      - PRODUCT_SERVICE_GRPC_ADDR=product-service:50053
+      - USER_SERVICE_GRPC_ADDR=user-service:50051
+      - INTERNAL_AUTH_TOKEN=dev-internal-token
+      - JWT_SECRET=your-secret-key
+    depends_on:
+      order-db:
+        condition: service_healthy
+    networks:
+      - ecommerce_network
+
+  order-db:
     image: postgres:16-alpine
+    container_name: order_service_db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: orders
     volumes:
-      - orderservice_db_data:/var/lib/postgresql/data
+      - order_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 3s
-      timeout: 5s
-      retries: 10
-      start_period: 5s
+      interval: 5s
     networks:
-      - ecommerce_default
-
-  orderservice:
-    build:
-      context: .
-      dockerfile: services/OrderService/docker/Dockerfile.dev
-    volumes:
-      - .:/app
-      - /app/tmp
-    environment:
-      - INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN:-dev-internal-token}
-      - DB_DSN=postgres://postgres:postgres@orderservice-db:5432/orders?sslmode=disable
-      - PRODUCT_SERVICE_GRPC_ADDR=productservice_app:50053
-      - USER_SERVICE_GRPC_ADDR=userservice_app:50051
-    depends_on:
-      orderservice-db:
-        condition: service_healthy
-    networks:
-      ecommerce_default:
-        aliases:
-          - orderservice_app
-
-  api-gateway:
-    build:
-      context: .
-      dockerfile: services/ApiGateway/docker/Dockerfile.dev
-    ports:
-      - "8080:8080"
-    volumes:
-      - .:/app
-      - /app/tmp
-    environment:
-      - APP_PORT=8080
-      - APP_ENV=production
-      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
-      - INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN:-dev-internal-token}
-      - ALLOWED_ORIGINS=*
-      - ALLOWED_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS
-      - ALLOWED_HEADERS=Accept,Authorization,Content-Type,X-Request-ID
-      - RATE_LIMIT_REQUESTS=100
-      - RATE_LIMIT_WINDOW_SECONDS=60
-      - USER_SERVICE_URL=userservice_app:50051
-      - PRODUCT_SERVICE_URL=productservice_app:50053
-      - CART_SERVICE_URL=cartservice_app:50057
-      - ORDER_SERVICE_URL=orderservice_app:50055
-      - REQUEST_TIMEOUT_SECONDS=30
-      - IDLE_TIMEOUT_SECONDS=120
-      - READ_TIMEOUT_SECONDS=15
-      - WRITE_TIMEOUT_SECONDS=15
-      - SERVICE_NAME=api-gateway
-    depends_on:
-      - userservice
-      - productservice
-      - cartservice
-      - orderservice
-    networks:
-      - ecommerce_default
-    restart: unless-stopped
-
-volumes:
-  userservice_db_data:
-  productservice_db_data:
-  orderservice_db_data:
+      - ecommerce_network
 
 networks:
-  ecommerce_default:
+  ecommerce_network:
     driver: bridge
+
+volumes:
+  user_db_data:
+  product_db_data:
+  order_db_data:

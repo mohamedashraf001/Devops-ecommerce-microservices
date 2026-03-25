@@ -1,27 +1,38 @@
-FROM golang:1.25.3-alpine AS builder
+# --- Stage 1: Build ---
+FROM golang:1.21-alpine3.18 AS builder
+RUN apk add --no-cache git ca-certificates
+
 WORKDIR /app
 
-# Copy go mod files
+# استغلال الـ Cache لملفات الـ Modules
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the entire project
-COPY . .
+# نسخ الكود المشترك والخدمة (سياق العمل هو الـ Root)
+COPY pkg/ ./pkg/
+COPY shared/ ./shared/
+COPY services/ProductService/ ./services/ProductService/
 
-# Build the service
-RUN CGO_ENABLED=0 GOOS=linux go build -o productservice ./services/ProductService/cmd/main.go
+# بناء الـ Binary مع تقليل الحجم حذف الـ Debug Info
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /product-service ./services/ProductService/cmd/main.go
 
-FROM gcr.io/distroless/static-debian12:nonroot
+# --- Stage 2: Runtime ---
+FROM alpine:3.18
+
+# إضافة مستخدم محدود الصلاحيات (Best Practice)
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
 WORKDIR /app
 
-# Copy the binary
-COPY --from=builder /app/productservice .
+# نسخ الشهادات الأمنية والـ Binary والـ Configs
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /product-service .
+COPY --from=builder /app/services/ProductService/config ./config
+COPY --from=builder /app/services/ProductService/internal/migrations ./migrations
 
-# Copy migration files (embedded in binary via go:embed)
-COPY --from=builder /app/services/ProductService/internal/migrations ./internal/migrations
+# تأمين الملفات للمستخدم الجديد
+RUN chown -R appuser:appgroup /app
+USER appuser
 
-USER nonroot:nonroot
-
-EXPOSE 8080 50051
-
-CMD ["./productservice"]
+EXPOSE 50053
+ENTRYPOINT ["./product-service"]

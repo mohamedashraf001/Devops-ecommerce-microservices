@@ -5,20 +5,44 @@ services:
     build:
       context: ../../..
       dockerfile: ./services/OrderService/docker/Dockerfile.dev
+    container_name: order_service_app
     volumes:
       - ../../..:/app
       - /app/tmp
     environment:
+      # إعدادات قاعدة البيانات - نستخدم اسم الخدمة "db" كـ host
+      - DB_DRIVER=postgres
+      - DB_DSN=host=db user=postgres password=postgres dbname=orders port=5432 sslmode=disable TimeZone=UTC
+      - DB_MIGRATION_AUTO_RUN=true
+      
+      # إعدادات السيرفر
+      - APP_PORT=8085
+      - GRPC_PORT=50055
+      - APP_ENV=development
+      
+      # إعدادات الخدمات الأخرى (تأكد من مطابقة الأسماء إذا كانت تعمل في دكر)
+      - PRODUCT_SERVICE_GRPC_ADDR=product-service:50053
+      - USER_SERVICE_GRPC_ADDR=user-service:50051
+      
+      # التوثيق والأمان
       - INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN:-dev-internal-token}
+      - SERVICE_NAME=order-service
+      
+      # إعدادات الـ Tracer (Jaeger)
+      - JAEGER_ENDPOINT=ecommerce-jaeger:4317
+    ports:
+      - "50055:50055"
+      - "8085:8085"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
-      order_service_network:
-      ecommerce_default:
-        aliases:
-          - orderservice_app
+      - order_service_network
+      - ecommerce_default
+
   db:
     image: postgres:16-alpine
+    container_name: order_service_db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -31,7 +55,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      order_service_network:
+      - order_service_network
 
 volumes:
   db_data:

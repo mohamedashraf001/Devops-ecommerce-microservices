@@ -2,17 +2,17 @@ FROM golang:1.25.3-alpine
 
 WORKDIR /app
 
-# Install air for hot reload
+# تثبيت Air
 RUN go install github.com/air-verse/air@latest
 
-# Copy go mod files
+# نسخ الـ modules أولاً لتسريع الـ Build
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the entire project
+# نسخ المشروع
 COPY . .
 
-EXPOSE 8080 50057
+EXPOSE 8082 50057
 
-# Use air for hot reload
-CMD ["/go/bin/air", "-c", "./services/CartService/.air.toml"]
+# تشغيل Air مع الإشارة للمسار الصحيح لملف الإعدادات الخاص بالـ Cart
+CMD ["air", "-c", "services/CartService/.air.toml"]

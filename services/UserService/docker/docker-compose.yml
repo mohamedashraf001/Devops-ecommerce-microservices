@@ -5,20 +5,40 @@ services:
     build:
       context: ../../..
       dockerfile: ./services/UserService/docker/Dockerfile.dev
+    container_name: user_service_app
     volumes:
       - ../../..:/app
       - /app/tmp
     environment:
+      # إعدادات قاعدة البيانات - نستخدم اسم الخدمة "db" كـ host
+      - DB_DRIVER=postgres
+      - DB_DSN=host=db user=postgres password=postgres dbname=ecommerce port=5432 sslmode=disable TimeZone=UTC
+      - DB_MIGRATION_AUTO_RUN=true
+      
+      # إعدادات السيرفر
+      - APP_PORT=8081
+      - GRPC_PORT=50051
+      - APP_ENV=development
+      
+      # التوثيق والأمان
       - INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN:-dev-internal-token}
+      - SERVICE_NAME=user-service
+      
+      # إعدادات الـ Tracer
+      - JAEGER_ENDPOINT=ecommerce-jaeger:4317
+    ports:
+      - "50051:50051"
+      - "8081:8081"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
-      user_service_network:
-      ecommerce_default:
-        aliases:
-          - userservice_app
+      - user_service_network
+      - ecommerce_default
+
   db:
     image: postgres:16-alpine
+    container_name: user_service_db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
