@@ -10,27 +10,26 @@ services:
       - ../../..:/app
       - /app/tmp
     environment:
-      # إعدادات السيرفر
+ 
       - APP_PORT=8000
       - APP_ENV=development
       - SERVICE_NAME=api-gateway
       
-      # التوثيق والأمان
+ 
       - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
       - INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN:-dev-internal-token}
       
-      # ✅ استخدام service names بدل container_name
       - USER_SERVICE_URL=user_service_app:50051
       - PRODUCT_SERVICE_URL=product-service:50053
       - CART_SERVICE_URL=cart-service:50057
       - ORDER_SERVICE_URL=order_service_app:50055
       
-      # إعدادات الـ Circuit Breaker و Rate Limiting
+     
       - CB_ENABLED=true
       - RATE_LIMIT_REQUESTS=100
       - RATE_LIMIT_WINDOW_SECONDS=60
       
-      # CORS
+      
       - ALLOWED_ORIGINS=*
       - ALLOWED_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS
       - ALLOWED_HEADERS=Accept,Authorization,Content-Type,X-Request-ID

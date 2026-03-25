@@ -2,17 +2,13 @@ FROM golang:1.25.3-alpine
 
 WORKDIR /app
 
-# تثبيت Air
 RUN go install github.com/air-verse/air@latest
 
-# نسخ الـ modules أولاً لتسريع الـ Build
 COPY go.mod go.sum ./
 RUN go mod download
 
-# نسخ المشروع
 COPY . .
 
 EXPOSE 8082 50057
 
-# تشغيل Air مع الإشارة للمسار الصحيح لملف الإعدادات الخاص بالـ Cart
 CMD ["air", "-c", "services/CartService/.air.toml"]

@@ -10,21 +10,17 @@ services:
       - ../../..:/app
       - /app/tmp
     environment:
-      # إعدادات قاعدة البيانات - نستخدم اسم الخدمة "db" كـ host
       - DB_DRIVER=postgres
       - DB_DSN=host=db user=postgres password=postgres dbname=ecommerce port=5432 sslmode=disable TimeZone=UTC
       - DB_MIGRATION_AUTO_RUN=true
       
-      # إعدادات السيرفر
       - APP_PORT=8081
       - GRPC_PORT=50051
       - APP_ENV=development
       
-      # التوثيق والأمان
       - INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN:-dev-internal-token}
       - SERVICE_NAME=user-service
       
-      # إعدادات الـ Tracer
       - JAEGER_ENDPOINT=ecommerce-jaeger:4317
     ports:
       - "50051:50051"

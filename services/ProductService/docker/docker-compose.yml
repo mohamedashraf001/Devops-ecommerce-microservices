@@ -51,7 +51,7 @@ services:
         condition: service_healthy
     networks:
       - product-net
-      - ecommerce_default   # 👈 مهم جدًا
+      - ecommerce_default  
 
 volumes:
   product-db-data:
