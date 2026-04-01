@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-service-config
+  namespace: ecommerce
+data:
+  DB_DRIVER: postgres
+  DB_DSN: host=order-postgres user=postgres password=postgres dbname=orders port=5432 sslmode=disable
+
+  GRPC_PORT: "50055"
+  APP_PORT: "8085"
+  DB_MIGRATION_AUTO_RUN: "true"
+
+  PRODUCT_SERVICE_GRPC_ADDR: product-service:50053
+  USER_SERVICE_GRPC_ADDR: user-service:50051
+
+  SERVICE_NAME: order-service
+  APP_ENV: production

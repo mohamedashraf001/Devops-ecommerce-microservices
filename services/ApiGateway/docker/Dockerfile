@@ -26,8 +26,6 @@ WORKDIR /root/
 # Copy binary from builder
 COPY --from=builder /app/api-gateway .
 
-# Copy config files
-COPY --from=builder /app/services/ApiGateway/config/.env ./config/.env
 
 EXPOSE 8000
 

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-config
+  namespace: ecommerce
+data:
+  DB_DRIVER: postgres
+  DB_DSN: host=user-postgres user=postgres password=postgres dbname=ecommerce port=5432 sslmode=disable
+
+  DB_MIGRATION_AUTO_RUN: "true"
+
+  GRPC_PORT: "50051"
+  APP_PORT: "8081"
+  APP_ENV: "production"
+
+  SERVICE_NAME: user-service

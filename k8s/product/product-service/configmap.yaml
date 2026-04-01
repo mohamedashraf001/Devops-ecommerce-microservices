@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-service-config
+  namespace: ecommerce
+data:
+  DB_DRIVER: postgres
+  DB_DSN: host=product-postgres user=postgres password=postgres dbname=products port=5432 sslmode=disable
+
+  GRPC_PORT: "50053"
+  DB_MIGRATION_AUTO_RUN: "true"
+
+  REDIS_HOST: product-redis
+  REDIS_PORT: "6379"
+  ENABLE_CACHE: "true"
+
+  SERVICE_NAME: product-service

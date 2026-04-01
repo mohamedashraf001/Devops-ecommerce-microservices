@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cart-redis
+  namespace: ecommerce
+spec:
+  selector:
+    app: cart-redis
+  ports:
+    - port: 6379

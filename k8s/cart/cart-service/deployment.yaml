@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cart-service
+  namespace: ecommerce
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: cart-service
+
+  template:
+    metadata:
+      labels:
+        app: cart-service
+
+    spec:
+      containers:
+        - name: cart-service
+          image: mohamedashraf001/cart-service:latest
+
+          ports:
+            - containerPort: 50057
+
+          envFrom:
+            - configMapRef:
+                name: cart-service-config
+            - secretRef:
+                name: cart-service-secret
+
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "400m"
+              memory: "512Mi"

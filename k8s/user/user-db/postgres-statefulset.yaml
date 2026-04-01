@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: user-postgres
+  namespace: ecommerce
+spec:
+  serviceName: user-postgres
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: user-postgres
+
+  template:
+    metadata:
+      labels:
+        app: user-postgres
+
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+
+          env:
+            - name: POSTGRES_DB
+              value: ecommerce
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: postgres
+
+          ports:
+            - containerPort: 5432
+
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: user-postgres-sc
+        resources:
+          requests:
+            storage: 5Gi
