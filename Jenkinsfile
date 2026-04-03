@@ -1,88 +1,41 @@
 pipeline {
-    agent {
-        docker {
-            image 'golang:1.25.3'
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
-        }
-    }
+    agent any
 
     stages {
-
         stage('Checkout') {
             steps {
-                checkout scm
+                git 'https://github.com/mohamedashraf001/Devops-ecommerce-microservices.git'
             }
         }
-    stage('Detect Changes') {
-        steps {
-            script {
-                def changedServices = []
 
-                for (changeLog in currentBuild.changeSets) {
-                    for (entry in changeLog.items) {
-                        for (file in entry.affectedFiles) {
-                            def filePath = file.path
-
-                            if (filePath.startsWith("services/ApiGateway")) {
-                                changedServices.add("ApiGateway")
-                            }
-                            if (filePath.startsWith("services/CartService")) {
-                                changedServices.add("CartService")
-                            }
-                            if (filePath.startsWith("services/OrderService")) {
-                                changedServices.add("OrderService")
-                            }
-                            if (filePath.startsWith("services/ProductService")) {
-                                changedServices.add("ProductService")
-                            }
-                            if (filePath.startsWith("services/UserService")) {
-                                changedServices.add("UserService")
-                            }
-                        }
-                    }
-                }
-
-                changedServices = changedServices.unique()
-
-                if (changedServices.isEmpty()) {
-                    echo "⚠️ No changes detected → building ALL services (fallback)"
-                    changedServices = [
-                        "ApiGateway",
-                        "CartService",
-                        "OrderService",
-                        "ProductService",
-                        "UserService"
-                    ]
-                }
-
-                env.CHANGED_SERVICES = changedServices.join(",")
-                echo "Changed services: ${env.CHANGED_SERVICES}"
-            }
-        }
-    }
-
-        stage('Build Changed Services') {
+        stage('Detect Changes') {
             steps {
                 script {
-                    def services = env.CHANGED_SERVICES.split(",")
+                    // مثال: detect التغييرات في كل خدمة
+                    def changed = sh(script: "git diff --name-only HEAD~1 HEAD | grep 'services/' | cut -d '/' -f2 | sort | uniq", returnStdout: true).trim()
+                    echo "Changed services: ${changed}"
+                    env.CHANGED_SERVICES = changed
+                }
+            }
+        }
 
-                    for (svc in services) {
-                        if (svc?.trim()) {
-                            buildService(svc)
+        stage('Build & Run Docker') {
+            steps {
+                script {
+                    if (env.CHANGED_SERVICES) {
+                        def services = env.CHANGED_SERVICES.split("\n")
+                        for (s in services) {
+                            echo "Building and running Docker for ${s}"
+                            sh """
+                                docker build -f services/${s}/Dockerfile.dev -t ${s}:dev ./services/${s}
+                                docker run -d -p 8${s.hashCode().abs() % 1000}:8082 --name ${s} ${s}:dev
+                            """
                         }
+                    } else {
+                        echo "No services changed"
                     }
                 }
             }
         }
     }
-}
-
-def buildService(serviceName) {
-    echo "Building ${serviceName}"
-
-    sh """
-        cd services/${serviceName}
-        go mod tidy
-        go build -o app
-    """
 }
