@@ -1,10 +1,12 @@
+@Library('shared-lib') _
+
 pipeline {
     agent any
 
     environment {
         SERVICE_NAME = "cart-service"
         IMAGE_NAME = "cart-service"
-        REGISTRY = "local"
+        PORT = "8082"
     }
 
     stages {
@@ -15,39 +17,16 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build') {
             steps {
-                script {
-                    sh """
-                    docker build -t ${IMAGE_NAME}:latest \
-                    -f services/CartService/Dockerfile .
-                    """
-                }
+                dockerBuild(IMAGE_NAME, "services/CartService/Dockerfile", ".")
             }
         }
 
-        stage('Run Container (Test)') {
+        stage('Run') {
             steps {
-                script {
-                    sh """
-                    docker stop ${SERVICE_NAME} || true
-                    docker rm ${SERVICE_NAME} || true
-
-                    docker run -d --name ${SERVICE_NAME} \
-                    -p 8082:8082 \
-                    ${IMAGE_NAME}:latest
-                    """
-                }
+                dockerRun(SERVICE_NAME, IMAGE_NAME, PORT)
             }
-        }
-    }
-
-    post {
-        always {
-            echo 'Pipeline finished'
-        }
-        failure {
-            echo 'Build failed'
         }
     }
 }
