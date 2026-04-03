@@ -1,31 +1,39 @@
-@Library('shared-lib@main') _
+@Library('ecommerce-shared-lib') _
+
+def SERVICE = "cart-service"
+def PORT = "8082"
+
 pipeline {
     agent any
-
-    environment {
-        SERVICE_NAME = "cart-service"
-        IMAGE_NAME = "cart-service"
-        PORT = "8082"
-    }
 
     stages {
 
         stage('Checkout') {
             steps {
-                checkout scm
+                gitCheckout()
             }
         }
 
         stage('Build') {
             steps {
-                dockerBuild(IMAGE_NAME, "services/CartService/Dockerfile", ".")
+                buildDocker(SERVICE)
             }
         }
 
         stage('Run') {
             steps {
-                dockerRun(SERVICE_NAME, IMAGE_NAME, PORT)
+                runDocker(SERVICE, PORT)
             }
+        }
+
+    }
+
+    post {
+        success {
+            notify("SUCCESS", SERVICE)
+        }
+        failure {
+            notify("FAILED", SERVICE)
         }
     }
 }
