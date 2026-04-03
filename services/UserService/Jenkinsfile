@@ -1,11 +1,12 @@
 @Library('shared-lib@main') _
+
 pipeline {
     agent any
 
     environment {
-        SERVICE_NAME = "cart-service"
-        IMAGE_NAME = "cart-service"
-        PORT = "8082"
+        SERVICE_NAME = "user-service"
+        IMAGE_NAME = "user-service"
+        PORT = "8081"
     }
 
     stages {
@@ -18,7 +19,7 @@ pipeline {
 
         stage('Build') {
             steps {
-                dockerBuild(IMAGE_NAME, "services/CartService/Dockerfile", ".")
+                dockerBuild(IMAGE_NAME, "services/UserService/Dockerfile", ".")
             }
         }
 
