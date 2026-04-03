@@ -1,0 +1,53 @@
+pipeline {
+    agent any
+
+    environment {
+        SERVICE_NAME = "cart-service"
+        IMAGE_NAME = "cart-service"
+        REGISTRY = "local"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh """
+                    docker build -t ${IMAGE_NAME}:latest \
+                    -f services/CartService/Dockerfile .
+                    """
+                }
+            }
+        }
+
+        stage('Run Container (Test)') {
+            steps {
+                script {
+                    sh """
+                    docker stop ${SERVICE_NAME} || true
+                    docker rm ${SERVICE_NAME} || true
+
+                    docker run -d --name ${SERVICE_NAME} \
+                    -p 8082:8082 \
+                    ${IMAGE_NAME}:latest
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline finished'
+        }
+        failure {
+            echo 'Build failed'
+        }
+    }
+}
