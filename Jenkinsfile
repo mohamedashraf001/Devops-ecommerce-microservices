@@ -13,7 +13,7 @@ pipeline {
                 checkout scm
             }
         }
-        
+
         stage('Detect Changes') {
             steps {
                 script {
@@ -73,16 +73,15 @@ pipeline {
     }
 }
 
-// Function to build and run Docker container
 def dockerBuildAndRun(serviceName) {
     echo "Building Docker for ${serviceName}"
 
-    def servicePath = "services/${serviceName}/docker"
+    def servicePath = "services/${serviceName}" // Docker context = service folder
+    def dockerfilePath = "${servicePath}/docker/Dockerfile" // path to Dockerfile
     def imageName = "${serviceName.toLowerCase()}:latest"
 
     sh """
-        cd ${servicePath}
-        docker build -t ${DOCKER_REGISTRY}/${imageName} .
+        docker build -t ${DOCKER_REGISTRY}/${imageName} -f ${dockerfilePath} ${servicePath}
         docker rm -f ${serviceName}-test || true
         docker run -d --name ${serviceName}-test ${DOCKER_REGISTRY}/${imageName}
     """
