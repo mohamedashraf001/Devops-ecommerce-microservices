@@ -13,36 +13,45 @@ pipeline {
                 checkout scm
             }
         }
-
+        
         stage('Detect Changes') {
             steps {
                 script {
-                    def changedFiles = sh(
-                        script: "git diff --name-only HEAD~1 HEAD",
-                        returnStdout: true
-                    ).trim().split("\n")
+                    // Array services
+                    def allServices = [
+                        "ApiGateway",
+                        "CartService",
+                        "OrderService",
+                        "ProductService",
+                        "UserService"
+                    ]
 
                     def changedServices = []
 
-                    for (file in changedFiles) {
-                        if (file.startsWith("services/ApiGateway")) {
-                            changedServices.add("ApiGateway")
-                        }
-                        if (file.startsWith("services/CartService")) {
-                            changedServices.add("CartService")
-                        }
-                        if (file.startsWith("services/OrderService")) {
-                            changedServices.add("OrderService")
-                        }
-                        if (file.startsWith("services/ProductService")) {
-                            changedServices.add("ProductService")
-                        }
-                        if (file.startsWith("services/UserService")) {
-                            changedServices.add("UserService")
+                    // اكتشاف التغييرات من Git
+                    for (changeLog in currentBuild.changeSets) {
+                        for (entry in changeLog.items) {
+                            for (file in entry.affectedFiles) {
+                                def filePath = file.path
+                                for (svc in allServices) {
+                                    if (filePath.startsWith("services/${svc}")) {
+                                        changedServices.add(svc)
+                                    }
+                                }
+                            }
                         }
                     }
 
-                    env.CHANGED_SERVICES = changedServices.unique().join(",")
+                    // إزالة التكرار
+                    changedServices = changedServices.unique()
+
+                    // لو مفيش تغييرات، نبني كل الخدمات
+                    if (changedServices.isEmpty()) {
+                        echo "⚠️ No changes detected → building ALL services (fallback)"
+                        changedServices = allServices
+                    }
+
+                    env.CHANGED_SERVICES = changedServices.join(",")
                     echo "Changed services: ${env.CHANGED_SERVICES}"
                 }
             }
