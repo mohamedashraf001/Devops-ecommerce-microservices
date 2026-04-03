@@ -1,5 +1,14 @@
-@Library('my-shared-library') _
+@Library('shared-lib@main') _
 
-microservicePipeline(
-    serviceName: 'UserService'
-)
+def SERVICE = "user-service"
+def PORT = "8081"
+
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') { steps { gitCheckout() } }
+        stage('Build') { steps { buildDocker(SERVICE) } }
+        stage('Run') { steps { runDocker(SERVICE, PORT) } }
+    }
+}
