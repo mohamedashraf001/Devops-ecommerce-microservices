@@ -15,7 +15,7 @@ type Config struct {
 	AppPort string
 	AppEnv  string
 
-	// Database
+	// Databasee
 	DBDriver            string
 	DBDSN               string
 	DBConnectionMaxIdle int
