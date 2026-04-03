@@ -11,7 +11,7 @@ import (
 )
 
 type Config struct {
-	// Serverr
+	// Serverrr
 	AppPort string
 	AppEnv  string
 
