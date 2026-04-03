@@ -1,8 +1,9 @@
 pipeline {
-    agent any
-
-    environment {
-        SERVICES = "ApiGateway CartService OrderService ProductService UserService"
+    agent {
+        docker {
+            image 'golang:1.22'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
     }
 
     stages {
