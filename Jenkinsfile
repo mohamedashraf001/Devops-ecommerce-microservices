@@ -65,17 +65,16 @@ pipeline {
                         def serviceName = svc
                         parallelBuilds[serviceName] = {
                             dir("services/${serviceName}") {
-                                // Docker build inside container, push to Docker Hub
                                 docker.withRegistry('https://index.docker.io/v1/', DOCKERHUB_CRED) {
-                                    // Build image using Dockerfile
-                                    def image = docker.build("mohamedashraf001/${serviceName}:latest")
+                                    // Convert to lowercase
+                                    def imageName = "mohamedashraf001/${serviceName.toLowerCase()}:latest"
+                                    def image = docker.build(imageName)
                                     image.push()
                                 }
                             }
                         }
                     }
 
-                    // Run all builds in parallel
                     parallel parallelBuilds
                 }
             }
