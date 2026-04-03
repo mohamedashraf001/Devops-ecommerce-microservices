@@ -1,8 +1,12 @@
-def call(String imageName, String dockerfilePath, String contextDir = ".") {
+def call(String containerName, String imageName, String port) {
     sh """
-    echo "Building Docker Image: ${imageName}"
+    echo "Running container: ${containerName}"
 
-    docker build -t ${imageName}:latest \
-    -f ${dockerfilePath} ${contextDir}
+    docker stop ${containerName} || true
+    docker rm ${containerName} || true
+
+    docker run -d --name ${containerName} \
+    -p ${port}:${port} \
+    ${imageName}:latest
     """
 }
