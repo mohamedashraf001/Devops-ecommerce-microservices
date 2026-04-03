@@ -3,11 +3,10 @@ pipeline {
 
     environment {
         SERVICES = "ApiGateway CartService OrderService ProductService UserService"
-        DOCKER_REGISTRY = "local" // ممكن تغيره بعدين لـ DockerHub أو registry داخلي
+        DOCKER_REGISTRY = "local"
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 checkout scm
@@ -17,7 +16,6 @@ pipeline {
         stage('Detect Changes') {
             steps {
                 script {
-                    // Array services
                     def allServices = [
                         "ApiGateway",
                         "CartService",
@@ -28,7 +26,7 @@ pipeline {
 
                     def changedServices = []
 
-                    // اكتشاف التغييرات من Git
+                    // Detect changes using Git
                     for (changeLog in currentBuild.changeSets) {
                         for (entry in changeLog.items) {
                             for (file in entry.affectedFiles) {
@@ -42,42 +40,50 @@ pipeline {
                         }
                     }
 
-                    // إزالة التكرار
+                    // Remove duplicates
                     changedServices = changedServices.unique()
 
-                    // لو مفيش تغييرات، نبني كل الخدمات
+                    // Fallback: if no changes detected, build all services
                     if (changedServices.isEmpty()) {
-                        echo "⚠️ No changes detected → building ALL services (fallback)"
+                        echo "⚠️ No changes detected → building ALL services"
                         changedServices = allServices
                     }
 
                     env.CHANGED_SERVICES = changedServices.join(",")
-                    echo "Changed services: ${env.CHANGED_SERVICES}"
+                    echo "Services to build: ${env.CHANGED_SERVICES}"
                 }
             }
         }
 
-        stage('Build & Run Docker for Changed Services') {
+        stage('Build & Run Docker') {
             steps {
                 script {
                     def services = env.CHANGED_SERVICES.split(",")
+                    def buildStages = [:]
 
+                    // Create parallel stages for each service
                     for (svc in services) {
-                        if (svc?.trim()) {
-                            dockerBuildAndRun(svc)
+                        def serviceName = svc.trim()
+                        if (serviceName) {
+                            buildStages[serviceName] = {
+                                dockerBuildAndRun(serviceName)
+                            }
                         }
                     }
+
+                    parallel buildStages
                 }
             }
         }
     }
 }
 
+// Function to build and run Docker container
 def dockerBuildAndRun(serviceName) {
-    echo "Building Docker for ${serviceName}"
+    echo "🔹 Building Docker for ${serviceName}"
 
-    def servicePath = "services/${serviceName}" // Docker context = service folder
-    def dockerfilePath = "${servicePath}/docker/Dockerfile" // path to Dockerfile
+    def servicePath = "services/${serviceName}"                  // Docker context
+    def dockerfilePath = "${servicePath}/docker/Dockerfile"     // Dockerfile path
     def imageName = "${serviceName.toLowerCase()}:latest"
 
     sh """
@@ -85,6 +91,6 @@ def dockerBuildAndRun(serviceName) {
         docker rm -f ${serviceName}-test || true
         docker run -d --name ${serviceName}-test ${DOCKER_REGISTRY}/${imageName}
     """
-    
-    echo "Service ${serviceName} is running in container ${serviceName}-test"
+
+    echo "✅ ${serviceName} container is running as ${serviceName}-test"
 }
