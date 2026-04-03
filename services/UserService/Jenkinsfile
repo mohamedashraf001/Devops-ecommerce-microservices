@@ -6,7 +6,7 @@ pipeline {
     environment {
         SERVICE_NAME = "user-service"
         IMAGE_NAME = "user-service"
-        PORT = "8081"
+        PORT = "50051"
     }
 
     stages {
