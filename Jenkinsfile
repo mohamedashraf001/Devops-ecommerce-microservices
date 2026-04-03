@@ -2,10 +2,12 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CRED = 'dockerhub-cred' // معرف الـ credentials في Jenkins
+        SERVICES = "ApiGateway CartService OrderService ProductService UserService"
+        DOCKER_REGISTRY = "local" // ممكن تغيره بعدين لـ DockerHub أو registry داخلي
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
@@ -15,84 +17,66 @@ pipeline {
         stage('Detect Changes') {
             steps {
                 script {
-                    // Array services
-                    def allServices = [
-                        "ApiGateway",
-                        "CartService",
-                        "OrderService",
-                        "ProductService",
-                        "UserService"
-                    ]
+                    def changedFiles = sh(
+                        script: "git diff --name-only HEAD~1 HEAD",
+                        returnStdout: true
+                    ).trim().split("\n")
 
                     def changedServices = []
 
-                    // اكتشاف التغييرات من Git
-                    for (changeLog in currentBuild.changeSets) {
-                        for (entry in changeLog.items) {
-                            for (file in entry.affectedFiles) {
-                                def filePath = file.path
-                                for (svc in allServices) {
-                                    if (filePath.startsWith("services/${svc}")) {
-                                        changedServices.add(svc)
-                                    }
-                                }
-                            }
+                    for (file in changedFiles) {
+                        if (file.startsWith("services/ApiGateway")) {
+                            changedServices.add("ApiGateway")
+                        }
+                        if (file.startsWith("services/CartService")) {
+                            changedServices.add("CartService")
+                        }
+                        if (file.startsWith("services/OrderService")) {
+                            changedServices.add("OrderService")
+                        }
+                        if (file.startsWith("services/ProductService")) {
+                            changedServices.add("ProductService")
+                        }
+                        if (file.startsWith("services/UserService")) {
+                            changedServices.add("UserService")
                         }
                     }
 
-                    // إزالة التكرار
-                    changedServices = changedServices.unique()
-
-                    // لو مفيش تغييرات، نبني كل الخدمات
-                    if (changedServices.isEmpty()) {
-                        echo "⚠️ No changes detected → building ALL services (fallback)"
-                        changedServices = allServices
-                    }
-
-                    env.CHANGED_SERVICES = changedServices.join(",")
+                    env.CHANGED_SERVICES = changedServices.unique().join(",")
                     echo "Changed services: ${env.CHANGED_SERVICES}"
                 }
             }
         }
 
-        stage('Build & Push Docker Images') {
+        stage('Build & Run Docker for Changed Services') {
             steps {
                 script {
-                    def services = env.CHANGED_SERVICES.split(',')
-                    def parallelBuilds = [:]
+                    def services = env.CHANGED_SERVICES.split(",")
 
                     for (svc in services) {
-                        def serviceName = svc
-                        parallelBuilds[serviceName] = {
-                            dir("services/${serviceName}") {
-                                docker.withRegistry('https://index.docker.io/v1/', DOCKERHUB_CRED) {
-                                    // Convert to lowercase
-                                    def imageName = "mohamedashraf001/${serviceName.toLowerCase()}:latest"
-                                    def image = docker.build(imageName)
-                                    image.push()
-                                }
-                            }
+                        if (svc?.trim()) {
+                            dockerBuildAndRun(svc)
                         }
                     }
-
-                    parallel parallelBuilds
                 }
             }
         }
-
-        stage('Notify Success') {
-            steps {
-                echo "✅ Docker images built and pushed for: ${env.CHANGED_SERVICES}"
-            }
-        }
     }
+}
 
-    post {
-        failure {
-            echo "❌ Pipeline failed!"
-        }
-        success {
-            echo "🚀 Pipeline succeeded!"
-        }
-    }
+// Function to build and run Docker container
+def dockerBuildAndRun(serviceName) {
+    echo "Building Docker for ${serviceName}"
+
+    def servicePath = "services/${serviceName}/docker"
+    def imageName = "${serviceName.toLowerCase()}:latest"
+
+    sh """
+        cd ${servicePath}
+        docker build -t ${DOCKER_REGISTRY}/${imageName} .
+        docker rm -f ${serviceName}-test || true
+        docker run -d --name ${serviceName}-test ${DOCKER_REGISTRY}/${imageName}
+    """
+    
+    echo "Service ${serviceName} is running in container ${serviceName}-test"
 }
