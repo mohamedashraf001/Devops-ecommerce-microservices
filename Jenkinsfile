@@ -42,7 +42,20 @@ pipeline {
                     }
                 }
 
-                env.CHANGED_SERVICES = changedServices.unique().join(",")
+                changedServices = changedServices.unique()
+
+                if (changedServices.isEmpty()) {
+                    echo "⚠️ No changes detected → building ALL services (fallback)"
+                    changedServices = [
+                        "ApiGateway",
+                        "CartService",
+                        "OrderService",
+                        "ProductService",
+                        "UserService"
+                    ]
+                }
+
+                env.CHANGED_SERVICES = changedServices.join(",")
                 echo "Changed services: ${env.CHANGED_SERVICES}"
             }
         }
